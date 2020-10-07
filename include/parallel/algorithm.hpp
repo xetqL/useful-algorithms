@@ -8,6 +8,7 @@
 #include <mpi.h>
 #include <algorithm>
 #include <serial/algorithm.hpp>
+
 namespace par {
 
     static std::ostream null(nullptr);
@@ -38,8 +39,11 @@ namespace par {
         return MPI_DATATYPE_NULL;
     }
     template<class Iter>
-    //T find_nth(std::vector<T> x, size_t look_for) {
     typename Iter::value_type find_nth(Iter itp, Iter itn, size_t look_for, MPI_Comm comm) {
+        return find_nth(itp, itn, look_for, comm, [](auto& v){return v;});
+    }
+    template<class Iter, class GetValFunc>
+    typename Iter::value_type find_nth(Iter itp, Iter itn, size_t look_for, MPI_Comm comm, GetValFunc getValue) {
         using T = typename Iter::value_type;
         int ws, rk;
         MPI_Comm_size(comm, &ws);
@@ -74,8 +78,8 @@ namespace par {
 
             MPI_Bcast(&pivot, 1, get_mpi_type<T>(), 0, MPI_COMM_WORLD);
 
-            auto li = std::partition(itp, itn, [pivot](const auto& v){return v  < pivot;});
-            auto pi = std::partition(li,  itn, [pivot](const auto& v){return v == pivot;});
+            auto li = std::partition(itp, itn, [pivot, getValue](const auto& v){ return getValue(v)  < pivot; });
+            auto pi = std::partition(li,  itn, [pivot, getValue](const auto& v){ return getValue(v) == pivot; });
 
             split_sizes = {std::distance(itp, li), std::distance(li, pi)};
 
@@ -92,6 +96,5 @@ namespace par {
 
         return pivot;
     }
-
 }
 #endif //USEFUL_ALGORITHMS_ALGORITHM_HPP
