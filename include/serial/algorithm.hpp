@@ -3,6 +3,7 @@
 #include <iterator>
 #include <algorithm>
 #include <vector>
+
 namespace ser {
 template<class InputIt>
 void partial_sort(InputIt begin, InputIt end, int stride) {
