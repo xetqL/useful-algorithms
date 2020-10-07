@@ -1,7 +1,7 @@
-#include "serial_algorithm.hpp"
+#include "serial/algorithm.hpp"
 #include <iostream>
 #include <array>
-
+using namespace ser;
 int main()
 {
     std::array<int, 0> x = {};

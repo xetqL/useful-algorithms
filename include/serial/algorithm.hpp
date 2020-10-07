@@ -3,7 +3,7 @@
 #include <iterator>
 #include <algorithm>
 #include <vector>
-
+namespace ser {
 template<class InputIt>
 void partial_sort(InputIt begin, InputIt end, int stride) {
   auto itp = begin, itn = itp;
@@ -29,4 +29,5 @@ std::vector<typename std::iterator_traits<InputIt>::value_type> partial_medians(
       itp = itn;
   }
   return medians;
+}
 }
