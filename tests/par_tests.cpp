@@ -28,6 +28,7 @@ int main()
     par::pcout() << "Time for parallel is " << (t2-t1) << " [s]" << std::endl;
 
     MPI_Barrier(MPI_COMM_WORLD);
+
     t1 = MPI_Wtime();
     std::vector<Numeric> all(S * w);
     MPI_Gather(x.data(), x.size(), par::get_mpi_type<Numeric>(), all.data(), x.size(), par::get_mpi_type<Numeric>(), 0, MPI_COMM_WORLD);

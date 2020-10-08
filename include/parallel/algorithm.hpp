@@ -8,7 +8,7 @@
 #include <mpi.h>
 #include <algorithm>
 #include <serial/algorithm.hpp>
-
+#include <random>
 namespace par {
 
     static std::ostream null(nullptr);
@@ -38,13 +38,12 @@ namespace par {
         if constexpr (std::is_same<T, char>::value) return MPI_CHAR;
         return MPI_DATATYPE_NULL;
     }
-    template<class Iter>
-    typename Iter::value_type find_nth(Iter itp, Iter itn, size_t look_for, MPI_Comm comm) {
-        return find_nth(itp, itn, look_for, comm, [](auto& v){return v;});
-    }
-    template<class Iter, class GetValFunc>
-    typename Iter::value_type find_nth(Iter itp, Iter itn, size_t look_for, MPI_Comm comm, GetValFunc getValue) {
+
+
+    template<class Iter, class LtComp, class EqComp, class BinaryComp>
+    typename Iter::value_type find_nth(Iter itp, Iter itn, size_t look_for, MPI_Comm comm, LtComp lt, EqComp eq, BinaryComp comp) {
         using T = typename Iter::value_type;
+        std::random_device rd;
         int ws, rk;
         MPI_Comm_size(comm, &ws);
         MPI_Comm_rank(comm, &rk);
@@ -56,12 +55,10 @@ namespace par {
         constexpr T zero = (T) 0, one = (T) 1;
         T pivot;
         do {
-            T median_of_medians;
-            auto medians = ser::partial_medians(itp, itn, 5);
-            std::nth_element(medians.begin(),  medians.begin() + medians.size() / 2, medians.end());
-            if(!medians.empty()) {
+            const auto N = std::distance(itp, itn);
+            if (N) {
                 pivot_msg.at(0) = one;
-                pivot_msg.at(1) = *(medians.begin() + medians.size() / 2);
+                pivot_msg.at(1) = *(itp+ (rd() % N));
             } else {
                 pivot_msg.at(0) = zero;
             }
@@ -72,14 +69,14 @@ namespace par {
                 cnt += unfiltered_medians.at(2*i);
             }
             if(!rk) {
-                std::nth_element(all_medians.begin(), all_medians.begin() + (cnt / 2), all_medians.begin()+cnt);
+                std::nth_element(all_medians.begin(), all_medians.begin() + (cnt / 2), all_medians.begin() + cnt);
                 pivot = *(all_medians.begin() + (cnt / 2));
             }
 
             MPI_Bcast(&pivot, 1, get_mpi_type<T>(), 0, MPI_COMM_WORLD);
 
-            auto li = std::partition(itp, itn, [pivot, getValue](const auto& v){ return getValue(v)  < pivot; });
-            auto pi = std::partition(li,  itn, [pivot, getValue](const auto& v){ return getValue(v) == pivot; });
+            auto li = std::partition(itp, itn, [pivot, lt](const auto& v){ return lt(v, pivot); });
+            auto pi = std::partition(li,  itn, [pivot, eq](const auto& v){ return eq(v, pivot); });
 
             split_sizes = {std::distance(itp, li), std::distance(li, pi)};
 
@@ -95,6 +92,18 @@ namespace par {
         } while (!(look_for >= split_sizes[0] && look_for < split_sizes[0] + split_sizes[1]));
 
         return pivot;
+    }
+
+    template<class Iter>
+    typename Iter::value_type find_nth(Iter itp, Iter itn, size_t look_for, MPI_Comm comm) {
+        int ws;
+        MPI_Comm_size(comm, &ws);
+        if (ws > 1){
+            return find_nth(itp, itn, look_for, comm, std::less<>(), std::equal_to<>(), std::less<>());
+        } else {
+            std::nth_element(itp, itp + look_for, itn);
+            return *(itp+look_for);
+        }
     }
 }
 #endif //USEFUL_ALGORITHMS_ALGORITHM_HPP
