@@ -40,7 +40,7 @@ namespace par {
     }
 
 
-    template<class Iter, class GetVal, class LtComp, class EqComp, class BinaryComp>
+    template<class Iter, class GetVal>
     typename Iter::value_type find_nth(Iter itp, Iter itn, size_t look_for, MPI_Comm comm, GetVal getVal) {
 
         using T = decltype(getVal(std::declval<typename Iter::value_type>()));
