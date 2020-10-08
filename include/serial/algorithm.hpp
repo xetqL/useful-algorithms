@@ -5,6 +5,16 @@
 #include <vector>
 
 namespace ser {
+
+template<class T>
+struct identity_of{
+    T operator()(T&& v){
+        return std::forward<T>(v);
+    }
+    T operator()(T& v){
+        return std::forward<T>(v);
+    }
+};
 template<class InputIt, class Comp>
 void partial_sort(InputIt begin, InputIt end, long stride, Comp comp) {
   auto itp = begin, itn = itp;

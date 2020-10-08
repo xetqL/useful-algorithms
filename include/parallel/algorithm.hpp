@@ -40,16 +40,17 @@ namespace par {
     }
 
 
-    template<class Iter, class LtComp, class EqComp, class BinaryComp>
-    typename Iter::value_type find_nth(Iter itp, Iter itn, size_t look_for, MPI_Comm comm, LtComp lt, EqComp eq, BinaryComp comp) {
-        using T = typename Iter::value_type;
+    template<class Iter, class GetVal, class LtComp, class EqComp, class BinaryComp>
+    typename Iter::value_type find_nth(Iter itp, Iter itn, size_t look_for, MPI_Comm comm, GetVal getVal) {
+
+        using T = decltype(getVal(std::declval<typename Iter::value_type>()));
         std::random_device rd;
         int ws, rk;
         MPI_Comm_size(comm, &ws);
         MPI_Comm_rank(comm, &rk);
         size_t cnt;
         std::array<long, 2> split_sizes {};
-        std::array<T, 2> pivot_msg {};
+        std::array <T, 2> pivot_msg {};
         std::vector<T> unfiltered_medians(2*ws);
         std::vector<T> all_medians(ws);
         constexpr T zero = (T) 0, one = (T) 1;
@@ -58,7 +59,7 @@ namespace par {
             const auto N = std::distance(itp, itn);
             if (N) {
                 pivot_msg.at(0) = one;
-                pivot_msg.at(1) = *(itp+ (rd() % N));
+                pivot_msg.at(1) = getVal(*(itp+ (rd() % N)));
             } else {
                 pivot_msg.at(0) = zero;
             }
@@ -75,8 +76,8 @@ namespace par {
 
             MPI_Bcast(&pivot, 1, get_mpi_type<T>(), 0, MPI_COMM_WORLD);
 
-            auto li = std::partition(itp, itn, [pivot, lt](const auto& v){ return lt(v, pivot); });
-            auto pi = std::partition(li,  itn, [pivot, eq](const auto& v){ return eq(v, pivot); });
+            auto li = std::partition(itp, itn, [pivot, getVal](const auto& v){ return getVal(v) < pivot; });
+            auto pi = std::partition(li,  itn, [pivot, getVal](const auto& v){ return getVal(v) == pivot; });
 
             split_sizes = {std::distance(itp, li), std::distance(li, pi)};
 
@@ -99,7 +100,7 @@ namespace par {
         int ws;
         MPI_Comm_size(comm, &ws);
         if (ws > 1){
-            return find_nth(itp, itn, look_for, comm, std::less<>(), std::equal_to<>(), std::less<>());
+            return find_nth(itp, itn, look_for, comm, ser::identity_of<typename Iter::value_type>());
         } else {
             std::nth_element(itp, itp + look_for, itn);
             return *(itp+look_for);
