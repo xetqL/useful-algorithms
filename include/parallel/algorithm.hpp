@@ -20,6 +20,8 @@ namespace par {
         else return null;
     }
 
+
+
     template<class T>
     constexpr MPI_Datatype get_mpi_type() {
         if constexpr (std::is_same<T, float>::value) return MPI_FLOAT;
@@ -41,8 +43,7 @@ namespace par {
 
 
     template<class Iter, class GetVal>
-    typename Iter::value_type find_nth(Iter itp, Iter itn, size_t look_for, MPI_Comm comm, GetVal getVal) {
-
+    auto find_nth(Iter itp, Iter itn, size_t look_for, MPI_Comm comm, GetVal getVal) -> decltype(getVal(std::declval<typename Iter::value_type>())) {
         using T = decltype(getVal(std::declval<typename Iter::value_type>()));
         std::random_device rd;
         int ws, rk;
