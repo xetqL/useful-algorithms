@@ -9,6 +9,9 @@
 #include <algorithm>
 #include <serial/algorithm.hpp>
 #include <random>
+#include <serial/type.hpp>
+#include <serial/format.hpp>
+
 namespace par {
 
     static std::ostream null(nullptr);
@@ -19,8 +22,6 @@ namespace par {
         if(rank == 0) return std::cout;
         else return null;
     }
-
-
 
     template<class T>
     constexpr MPI_Datatype get_mpi_type() {
@@ -41,71 +42,82 @@ namespace par {
         return MPI_DATATYPE_NULL;
     }
 
-
-    template<class Iter, class GetVal>
-    auto find_nth(Iter itp, Iter itn, size_t look_for, MPI_Comm comm, GetVal getVal) -> decltype(getVal(std::declval<typename Iter::value_type>())) {
-        using T = decltype(getVal(std::declval<typename Iter::value_type>()));
-        std::random_device rd;
+namespace{
+    template<class Iter, class LesserThanComp, class EqComp>
+    auto __find_nth(Iter itp, Iter itn, size_t look_for, MPI_Datatype datatype, MPI_Comm comm, LesserThanComp lt, EqComp eq) -> typename Iter::value_type {
+        using T = typename Iter::value_type;
         int ws, rk;
         MPI_Comm_size(comm, &ws);
         MPI_Comm_rank(comm, &rk);
-        size_t cnt;
-        std::array<long, 2> split_sizes {};
-        std::array <T, 2> pivot_msg {};
-        std::vector<T> unfiltered_medians(2*ws);
-        std::vector<T> all_medians(ws);
-        constexpr T zero = (T) 0, one = (T) 1;
-        T pivot;
+        unsigned long split_size[3];
+        std::vector<long> pivot_msgs(ws);
+        srand(rk + time(nullptr));
+        T* pivot = (T*) new char[sizeof(T)];
+        T* all_medians = (T*) new char[sizeof(T)*ws];
         do {
-            const auto N = std::distance(itp, itn);
+            long N = std::distance(itp, itn);
+            MPI_Gather(&N, 1, get_mpi_type<long>(), pivot_msgs.data(), 1, get_mpi_type<long>(), 0, comm);
+
             if (N) {
-                pivot_msg.at(0) = one;
-                pivot_msg.at(1) = getVal(*(itp+ (rd() % N)));
-            } else {
-                pivot_msg.at(0) = zero;
+                T local_pivot = *(itp + (rand() % N));
+                MPI_Send(&local_pivot, 1, datatype, 0, 777, comm);
             }
-            MPI_Gather(pivot_msg.data(), 2, get_mpi_type<T>(), unfiltered_medians.data(), 2, get_mpi_type<T>(), 0, MPI_COMM_WORLD);
-            cnt = 0;
-            for(size_t i = 0; i < ws; ++i) {
-                all_medians.at(cnt) = unfiltered_medians.at(2*i+1);
-                cnt += unfiltered_medians.at(2*i);
-            }
+
             if(!rk) {
-                std::nth_element(all_medians.begin(), all_medians.begin() + (cnt / 2), all_medians.begin() + cnt);
-                pivot = *(all_medians.begin() + (cnt / 2));
+                auto pivot_count = std::count_if(pivot_msgs.begin(), pivot_msgs.end(), [](auto v){return v;});
+                for(auto i = 0; i < pivot_count; i++) {
+                    MPI_Recv((all_medians+i), 1, datatype, MPI_ANY_SOURCE, 777, comm, MPI_STATUSES_IGNORE);
+                }
+                std::nth_element(all_medians, all_medians + (pivot_count / 2), all_medians + pivot_count, lt);
+                *pivot = all_medians[pivot_count / 2];
             }
 
-            MPI_Bcast(&pivot, 1, get_mpi_type<T>(), 0, MPI_COMM_WORLD);
+            MPI_Bcast(pivot, 1, datatype, 0, comm);
 
-            auto li = std::partition(itp, itn, [pivot, getVal](const auto& v){ return getVal(v) < pivot; });
-            auto pi = std::partition(li,  itn, [pivot, getVal](const auto& v){ return getVal(v) == pivot; });
+            auto ilt = std::partition(itp, itn, [pivot, lt](auto& v){ return lt(v, *pivot); });
+            auto ieq = std::partition(ilt, itn,  [pivot, eq](auto& v) { return eq(v, *pivot); });
 
-            split_sizes = {std::distance(itp, li), std::distance(li, pi)};
+            split_size[0] = std::distance(itp, ilt);
+            split_size[1] = std::distance(ilt, ieq);
 
-            MPI_Allreduce(MPI_IN_PLACE, &split_sizes, 2, get_mpi_type<decltype(split_sizes)::value_type>(), MPI_SUM, MPI_COMM_WORLD);
+            MPI_Allreduce(MPI_IN_PLACE, &split_size, 2, get_mpi_type<unsigned long>(), MPI_SUM, comm);
 
-            if(look_for < split_sizes[0]) {
-                itn = li;
-            } else if(look_for >= split_sizes[0] + split_sizes[1]){
-                itp = pi;
-                look_for = look_for - split_sizes[0] - split_sizes[1];
+            auto nlt = split_size[0];
+            auto neq = split_size[1];
+
+            if(look_for < nlt) {
+                itn = ilt;
+            } else if(look_for < (nlt + neq) ) {
+                break;
+            } else {
+                itp = ieq;
+                look_for = look_for-(nlt+neq);
             }
+        } while (true);
+        auto retval = *pivot;
 
-        } while (!(look_for >= split_sizes[0] && look_for < split_sizes[0] + split_sizes[1]));
+        delete[] all_medians;
+        delete[] pivot;
 
-        return pivot;
+        return retval;
+    }
+}
+
+    template<class Iter, class LtComp, class EqComp>
+    typename Iter::value_type find_nth(Iter itp, Iter itn, size_t look_for, MPI_Datatype datatype, MPI_Comm comm, LtComp lt, EqComp eq) {
+        int ws;
+        MPI_Comm_size(comm, &ws);
+        if (ws > 1){
+            return __find_nth(itp, itn, look_for, datatype, comm, lt, eq);
+        } else {
+            std::nth_element(itp, itp + look_for, itn, lt);
+            return *(itp+look_for);
+        }
     }
 
     template<class Iter>
     typename Iter::value_type find_nth(Iter itp, Iter itn, size_t look_for, MPI_Comm comm) {
-        int ws;
-        MPI_Comm_size(comm, &ws);
-        if (ws > 1){
-            return find_nth(itp, itn, look_for, comm, ser::identity_of<typename Iter::value_type>());
-        } else {
-            std::nth_element(itp, itp + look_for, itn);
-            return *(itp+look_for);
-        }
+        return find_nth(itp, itn, look_for, get_mpi_type<typename Iter::value_type>(), comm, std::less<>{}, std::equal_to<>{});
     }
 }
 #endif //USEFUL_ALGORITHMS_ALGORITHM_HPP

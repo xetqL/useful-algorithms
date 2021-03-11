@@ -3,6 +3,7 @@ project(useful_algorithms)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_COMPILER mpic++)
+
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY bin)
 find_package(MPI REQUIRED)
 
@@ -11,7 +12,8 @@ ENABLE_TESTING()
 
 add_executable(ser_tests
         include/serial/algorithm.hpp
-        tests/ser_tests.cpp)
+        tests/ser_tests.cpp include/serial/type.hpp
+        include/serial/format.hpp)
 
 add_executable(par_tests
         include/parallel/algorithm.hpp
