@@ -42,9 +42,9 @@ namespace par {
         return MPI_DATATYPE_NULL;
     }
 
-namespace{
+namespace {
     template<class Iter, class LesserThanComp, class EqComp>
-    auto __find_nth(Iter itp, Iter itn, size_t look_for, MPI_Datatype datatype, MPI_Comm comm, LesserThanComp lt, EqComp eq) -> typename Iter::value_type {
+    auto _find_nth(Iter itp, Iter itn, size_t look_for, MPI_Datatype datatype, MPI_Comm comm, LesserThanComp lt, EqComp eq) -> typename Iter::value_type {
         using T = typename Iter::value_type;
         int ws, rk;
         MPI_Comm_size(comm, &ws);
@@ -74,8 +74,8 @@ namespace{
 
             MPI_Bcast(pivot, 1, datatype, 0, comm);
 
-            auto ilt = std::partition(itp, itn, [pivot, lt](auto& v){ return lt(v, *pivot); });
-            auto ieq = std::partition(ilt, itn,  [pivot, eq](auto& v) { return eq(v, *pivot); });
+            auto ilt = std::partition(itp, itn, [pivot, lt](const auto& v){ return lt(v, *pivot); });
+            auto ieq = std::partition(ilt, itn,  [pivot, eq](const auto& v) { return eq(v, *pivot); });
 
             split_size[0] = std::distance(itp, ilt);
             split_size[1] = std::distance(ilt, ieq);
@@ -88,18 +88,20 @@ namespace{
             if(look_for < nlt) {
                 itn = ilt;
             } else if(look_for < (nlt + neq) ) {
-                break;
+                auto retval = *pivot;
+
+                delete[] all_medians;
+                delete[] pivot;
+
+                return retval;
             } else {
                 itp = ieq;
                 look_for = look_for-(nlt+neq);
             }
+
         } while (true);
-        auto retval = *pivot;
 
-        delete[] all_medians;
-        delete[] pivot;
 
-        return retval;
     }
 }
 
