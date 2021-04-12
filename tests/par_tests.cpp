@@ -16,7 +16,7 @@ int main()
 {
     using Numeric = int;
 
-    const Numeric S = 50'000;
+    const Numeric S = 1e4;
 
     MPI_Init(nullptr, nullptr);
     int w, r;
@@ -31,7 +31,7 @@ int main()
     MPI_Type_commit(&custom_dt);
 
     std::vector<IntHolder> x(S);
-    srand(r+time(NULL));
+    srand(0);
     for(auto& v : x) {
         v.myVal += (int) rand() % 10000;
     }

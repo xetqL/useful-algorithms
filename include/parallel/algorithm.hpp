@@ -16,7 +16,7 @@ namespace par {
 
     static std::ostream null(nullptr);
 
-    std::ostream& pcout() {
+    inline std::ostream& pcout() {
         int rank;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         if(rank == 0) return std::cout;
@@ -110,7 +110,7 @@ namespace {
         int ws;
         MPI_Comm_size(comm, &ws);
         if (ws > 1){
-            return __find_nth(itp, itn, look_for, datatype, comm, lt, eq);
+            return _find_nth(itp, itn, look_for, datatype, comm, lt, eq);
         } else {
             std::nth_element(itp, itp + look_for, itn, lt);
             return *(itp+look_for);
