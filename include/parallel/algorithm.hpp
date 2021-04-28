@@ -11,7 +11,7 @@
 #include <random>
 #include <serial/type.hpp>
 #include <serial/format.hpp>
-
+#include <iostream>
 namespace par {
 
     static std::ostream null(nullptr);
