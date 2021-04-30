@@ -6,7 +6,7 @@
 
 namespace ser {
 
-template<class ForwardIt1, class ForwardIt2 class OutputIt, class BinaryOp>
+template<class ForwardIt1, class ForwardIt2, class OutputIt, class BinaryOp>
 void combine(ForwardIt1 beginA, ForwardIt1 endA, ForwardIt2 beginB, OutputIt out, BinaryOp op) {
     for(; beginA != endA; beginA++, beginB++) {
         *out = op(*beginA, *beginB);
