@@ -6,6 +6,13 @@
 
 namespace ser {
 
+template<class ForwardIt, class OutputIt, class BinaryOp>
+void combine(ForwardIt beginA, ForwardIt endA, ForwardIt beginB, OutputIt out, BinaryOp op) {
+    for(; beginA != endA; beginA++, beginB++) {
+        *out = op(*beginA, *beginB);
+    }
+}
+
 template<class InputIt, class Comp>
 void stride_sort(InputIt begin, InputIt end, long stride, Comp comp) {
   auto itp = begin, itn = itp;
