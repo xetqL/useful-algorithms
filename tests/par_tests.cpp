@@ -8,15 +8,15 @@
 
 using namespace ser;
 
+using Numeric = int;
 struct IntHolder {
-    int myVal;
+    Numeric myVal;
 };
 
 int main()
 {
-    using Numeric = int;
 
-    const Numeric S = 1e4;
+    const Numeric S = 1e7;
 
     MPI_Init(nullptr, nullptr);
     int w, r;
@@ -25,7 +25,7 @@ int main()
 
     MPI_Aint displacements[1]  = {offsetof(IntHolder, myVal)};
     int block_lengths[1]  = {1};
-    MPI_Datatype types[1] = {MPI_INT};
+    MPI_Datatype types[1] = {par::get_mpi_type<Numeric>()};
     MPI_Datatype custom_dt;
     MPI_Type_create_struct(1, block_lengths, displacements, types, &custom_dt);
     MPI_Type_commit(&custom_dt);
@@ -33,7 +33,7 @@ int main()
     std::vector<IntHolder> x(S);
     srand(0);
     for(auto& v : x) {
-        v.myVal += (int) rand() % 10000;
+        v.myVal = (rand() % S);
     }
     MPI_Barrier(MPI_COMM_WORLD);
     auto t1 = MPI_Wtime();
