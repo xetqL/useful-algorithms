@@ -43,8 +43,8 @@ namespace par {
     }
 
 namespace {
-    template<class Iter, class LesserThanComp, class EqComp>
-    auto _find_nth(Iter itp, Iter itn, size_t look_for, MPI_Datatype datatype, MPI_Comm comm, LesserThanComp& lt) -> typename Iter::value_type {
+    template<class Iter, class LesserThanComp>
+    auto _find_nth(Iter itp, Iter itn, size_t look_for, MPI_Datatype datatype, MPI_Comm comm, LesserThanComp lt) -> typename Iter::value_type {
         using T = typename Iter::value_type;
         int ws, rk;
         MPI_Comm_size(comm, &ws);
@@ -106,8 +106,8 @@ namespace {
     }
 }
 
-    template<class Iter, class LtComp, class EqComp>
-    typename Iter::value_type find_nth(Iter itp, Iter itn, size_t look_for, MPI_Datatype datatype, MPI_Comm comm, LtComp& lt) {
+    template<class Iter, class LtComp>
+    typename Iter::value_type find_nth(Iter itp, Iter itn, size_t look_for, MPI_Datatype datatype, MPI_Comm comm, LtComp lt) {
         int ws;
         MPI_Comm_size(comm, &ws);
         if (ws > 1){
