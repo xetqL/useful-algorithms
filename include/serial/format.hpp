@@ -5,6 +5,8 @@
 #ifndef USEFUL_ALGORITHMS_FORMAT_HPP
 #define USEFUL_ALGORITHMS_FORMAT_HPP
 #include <memory>
+#include <sstream>
+#include <string>
 namespace ser {
 
 namespace {
