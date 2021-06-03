@@ -49,17 +49,17 @@ auto _find_nth(Iter itp, Iter itn, size_t look_for, MPI_Datatype datatype, MPI_C
     int ws, rk;
     MPI_Comm_size(comm, &ws);
     MPI_Comm_rank(comm, &rk);
-    unsigned long split_size[3];
+    unsigned long split_size[1];
     std::vector<long> pivot_msgs(ws);
 
-    T* pivot = (T*) new T[1];
+    T* pivot = (T*) new T;
     T* all_medians = (T*) new T[ws];
 
     std::sort(itp, itn, lt);
 
     unsigned iter = 0;
     do {
-        if(iter > 0 || !init_pivot){
+        if(iter > 0 || !init_pivot) {
             long N = std::distance(itp, itn);
             MPI_Gather(&N, 1, get_mpi_type<long>(), pivot_msgs.data(), 1, get_mpi_type<long>(), 0, comm);
 
@@ -75,7 +75,6 @@ auto _find_nth(Iter itp, Iter itn, size_t look_for, MPI_Datatype datatype, MPI_C
                 }
                 std::nth_element(all_medians, all_medians + (pivot_count / 2), all_medians + pivot_count, lt);
                 *pivot = all_medians[pivot_count / 2];
-
             }
             MPI_Bcast(pivot, 1, datatype, 0, comm);
         } else {
@@ -92,7 +91,7 @@ auto _find_nth(Iter itp, Iter itn, size_t look_for, MPI_Datatype datatype, MPI_C
 
         if(look_for < nlt) {
             itn = ilt;
-        } else if(nlt == 0) {
+        } else if(nlt == 0 || look_for == nlt) {
             auto retval = *pivot;
 
             delete[] all_medians;
@@ -103,10 +102,10 @@ auto _find_nth(Iter itp, Iter itn, size_t look_for, MPI_Datatype datatype, MPI_C
             itp = ilt;
             look_for = look_for - nlt;
         }
+
         iter++;
 
     } while (true);
-
 
 }
 }
@@ -124,7 +123,7 @@ typename Iter::value_type find_nth(Iter itp, Iter itn, size_t look_for, MPI_Data
 }
 
 template<class Iter, class LtComp>
-typename Iter::value_type find_nth(Iter itp, Iter itn, size_t look_for, MPI_Datatype datatype, MPI_Comm comm, LtComp lt, typename Iter::value_type init_pivot) {
+typename Iter::value_type find_nth(Iter itp, Iter itn, size_t look_for, MPI_Datatype datatype, MPI_Comm comm, LtComp lt, std::optional<typename Iter::value_type> init_pivot) {
     int ws;
     MPI_Comm_size(comm, &ws);
     if (ws > 1) {
