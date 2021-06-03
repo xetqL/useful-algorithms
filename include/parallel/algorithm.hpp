@@ -58,30 +58,33 @@ auto _find_nth(Iter itp, Iter itn, size_t look_for, MPI_Datatype datatype, MPI_C
     std::sort(itp, itn, lt);
 
     unsigned iter = 0;
+    Iter ilt;
     do {
-        if(iter > 0 || !init_pivot) {
-            long N = std::distance(itp, itn);
-            MPI_Gather(&N, 1, get_mpi_type<long>(), pivot_msgs.data(), 1, get_mpi_type<long>(), 0, comm);
 
-            if (N) {
-                T local_pivot = *(itp + N/2);
-                MPI_Send(&local_pivot, 1, datatype, 0, 777, comm);
-            }
+        long N = std::distance(itp, itn);
+        MPI_Gather(&N, 1, get_mpi_type<long>(), pivot_msgs.data(), 1, get_mpi_type<long>(), 0, comm);
 
-            if(!rk) {
-                auto pivot_count = std::count_if(pivot_msgs.begin(), pivot_msgs.end(), [](auto v){return v;});
-                for(auto i = 0; i < pivot_count; i++) {
-                    MPI_Recv((all_medians+i), 1, datatype, MPI_ANY_SOURCE, 777, comm, MPI_STATUSES_IGNORE);
-                }
-                std::nth_element(all_medians, all_medians + (pivot_count / 2), all_medians + pivot_count, lt);
-                *pivot = all_medians[pivot_count / 2];
+        if (N) {
+            T local_pivot;
+            if(iter > 0 || !init_pivot) {
+                local_pivot = *(itp + N / 2);
+            } else {
+                local_pivot = *std::lower_bound(itp, itn, init_pivot.value(), lt);
             }
-            MPI_Bcast(pivot, 1, datatype, 0, comm);
-        } else {
-            *pivot = init_pivot.value();
+            MPI_Send(&local_pivot, 1, datatype, 0, 777, comm);
         }
 
-        auto ilt = std::lower_bound(itp, itn, *pivot, lt);
+        if(!rk) {
+            auto pivot_count = std::count_if(pivot_msgs.begin(), pivot_msgs.end(), [](auto v){return v;});
+            for(auto i = 0; i < pivot_count; i++) {
+                MPI_Recv((all_medians+i), 1, datatype, MPI_ANY_SOURCE, 777, comm, MPI_STATUSES_IGNORE);
+            }
+            std::nth_element(all_medians, all_medians + (pivot_count / 2), all_medians + pivot_count, lt);
+            *pivot = all_medians[pivot_count / 2];
+        }
+        MPI_Bcast(pivot, 1, datatype, 0, comm);
+        ilt = std::lower_bound(itp, itn, *pivot, lt);
+
 
         split_size[0] = std::distance(itp, ilt);
 
