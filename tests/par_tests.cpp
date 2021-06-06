@@ -1,4 +1,5 @@
 #include "parallel/algorithm.hpp"
+#include "parallel/geomedian.hpp"
 
 #include <iostream>
 #include <array>
@@ -8,39 +9,31 @@
 
 using namespace ser;
 
-using Numeric = int;
-struct IntHolder {
+using Numeric = double;
+struct RealHolder {
     Numeric myVal;
 };
 
 int main()
 {
 
-    const Numeric S = 1e7;
+    const unsigned S = 1e5;
 
     MPI_Init(nullptr, nullptr);
     int w, r;
     MPI_Comm_size(MPI_COMM_WORLD, &w);
     MPI_Comm_rank(MPI_COMM_WORLD, &r);
 
-    MPI_Aint displacements[1]  = {offsetof(IntHolder, myVal)};
-    int block_lengths[1]  = {1};
-    MPI_Datatype types[1] = {par::get_mpi_type<Numeric>()};
-    MPI_Datatype custom_dt;
-    MPI_Type_create_struct(1, block_lengths, displacements, types, &custom_dt);
-    MPI_Type_commit(&custom_dt);
-
-    std::vector<IntHolder> x(S);
-    srand(0);
+    std::vector<RealHolder> x(S);
+    std::random_device rd;  //Will be used to obtain a seed for the random number engine
+    std::mt19937 gen(rd() + r); //Standard mersenne_twister_engine seeded with rd()
+    std::lognormal_distribution<> lognormalDistribution(0.0, 1.0);
     for(auto& v : x) {
-        v.myVal = (rand() % S);
+        v.myVal = (lognormalDistribution(gen));
     }
     MPI_Barrier(MPI_COMM_WORLD);
     auto t1 = MPI_Wtime();
-    par::pcout() << par::find_nth(std::begin(x), std::end(x), (x.size() * w)/2, custom_dt, MPI_COMM_WORLD,
-                                  [](auto& lhs, auto& rhs){return lhs.myVal < rhs.myVal; },
-                                  [](auto& lhs, auto& rhs){return lhs.myVal == rhs.myVal; }
-                                  ).myVal << std::endl;
+    par::pcout() << par::find_spatial_median(x.begin(), x.end(), 0.01, MPI_COMM_WORLD, [](auto& v){return v.myVal;}, std::nullopt).value_or(-1.0);
     MPI_Barrier(MPI_COMM_WORLD);
     auto t2 = MPI_Wtime();
     par::pcout() << "Time for parallel is " << (t2-t1) << " [s]" << std::endl;

@@ -11,7 +11,7 @@ namespace par {
 // can be downcast l8r
 
 template<class It, class GetValue>
-std::optional<double> find_spatial_median(It begin, It end, double min, double max, double tol, MPI_Comm comm, GetValue getVal, std::optional<double> guess){
+std::optional<double> find_spatial_median(It begin, It end, double tol, MPI_Comm comm, GetValue getVal, std::optional<double> guess){
     int rank, nprocs;
     MPI_Comm_size(comm, &nprocs);
     MPI_Comm_rank(comm, &rank);
@@ -25,7 +25,7 @@ std::optional<double> find_spatial_median(It begin, It end, double min, double m
     n_avg = n_total / nprocs;
     double imb = static_cast<double>(n_max) / static_cast<double>(n_avg);
 
-    auto mass_center = std::accumulate(begin, end, 0.0, [&getVal](auto& prev, auto& next){ return prev + getVal(next);});
+    double mass_center = std::accumulate(begin, end, 0.0, [&getVal](auto& prev, auto& next){ return prev + getVal(next);});
     mass_center /= static_cast<double>(n_total);
     MPI_Allreduce(MPI_IN_PLACE, &mass_center, 1, par::get_mpi_type<decltype(mass_center)>(), MPI_SUM, comm);
 

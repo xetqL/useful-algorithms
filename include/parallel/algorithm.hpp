@@ -82,9 +82,9 @@ auto _find_nth(Iter itp, Iter itn, size_t look_for, MPI_Datatype datatype, MPI_C
             std::nth_element(all_medians, all_medians + (pivot_count / 2), all_medians + pivot_count, lt);
             *pivot = all_medians[pivot_count / 2];
         }
+
         MPI_Bcast(pivot, 1, datatype, 0, comm);
         ilt = std::lower_bound(itp, itn, *pivot, lt);
-
 
         split_size[0] = std::distance(itp, ilt);
 
