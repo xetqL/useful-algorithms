@@ -30,24 +30,30 @@ std::optional<double> find_spatial_median(It begin, It end, double tol, MPI_Comm
     MPI_Allreduce(MPI_IN_PLACE, &mass_center, 1, par::get_mpi_type<decltype(mass_center)>(), MPI_SUM, comm);
 
     // check if actual median lies outside of tolerance zone
+    unsigned n_lower_than, n_greater_than;
     if(imb > tol) {
         double current_cut = guess.value_or(mass_center);
         while(true) {
+            std::cout << current_cut << std::endl;
+
             MPI_Bcast(&current_cut, 1, MPI_DOUBLE, 0, comm);
             auto n_lower_than_it = std::lower_bound(begin, end, current_cut, [&getVal](auto& v, auto& value){ return getVal(v) < value; });
-            unsigned n_lower_than = std::distance(begin, n_lower_than_it) , n_greater_than;
-            MPI_Allreduce(MPI_IN_PLACE, &n_lower_than, 1, par::get_mpi_type<decltype(n_lower_than)>(), MPI_SUM, comm);
+            unsigned currennt_n_lower_than;
+            MPI_Allreduce(MPI_IN_PLACE, &currennt_n_lower_than, 1, par::get_mpi_type<decltype(n_lower_than)>(), MPI_SUM, comm);
             n_greater_than = n_total - n_lower_than;
             imb = std::fabs(n_lower_than - n_greater_than) / n_total;
             if(imb <= tol) return current_cut;
+
             if (n_lower_than > n_greater_than) {
                 end = n_lower_than_it;
             } else if (n_greater_than > n_lower_than) {
                 begin = n_lower_than_it;
             }
+
             mass_center = std::accumulate(begin, end, 0.0, [&getVal](auto& prev, auto& next){ return prev + getVal(next);});
             mass_center /= static_cast<double>(n_total);
             MPI_Allreduce(MPI_IN_PLACE, &mass_center, 1, par::get_mpi_type<decltype(mass_center)>(), MPI_SUM, comm);
+            if(std::fabs(current_cut - mass_center) <= 1e-12) return std::nullopt;
             current_cut = mass_center;
         }
     } else {
