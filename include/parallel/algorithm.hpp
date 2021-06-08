@@ -60,7 +60,6 @@ auto _find_nth(Iter itp, Iter itn, size_t look_for, MPI_Datatype datatype, MPI_C
     unsigned iter = 0;
     Iter ilt;
     do {
-
         long N = std::distance(itp, itn);
         MPI_Gather(&N, 1, get_mpi_type<long>(), pivot_msgs.data(), 1, get_mpi_type<long>(), 0, comm);
 

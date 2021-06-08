@@ -11,54 +11,50 @@ namespace par {
 // can be downcast l8r
 
 template<class It, class GetValue>
-std::optional<double> find_spatial_median(It begin, It end, double tol, MPI_Comm comm, GetValue getVal, std::optional<double> guess){
-    int rank, nprocs;
-    MPI_Comm_size(comm, &nprocs);
-    MPI_Comm_rank(comm, &rank);
+std::optional<double> find_spatial_median(int rank, int nprocs, It begin, It end, double tol, MPI_Comm comm, GetValue getVal, std::optional<double> guess) {
+    const double epsilon = 1e-9, half = 0.5, acceptable_range_min = half - tol, acceptable_range_max = half + tol;
+    unsigned iteration = 0;
     auto n_local = std::distance(begin, end);
-    decltype(n_local) n_total, n_avg, n_max;
-
-    std::sort(begin, end, [&getVal](auto& a, auto& b){ return getVal(a) < getVal(b); });
+    decltype(n_local) n_total;
 
     MPI_Allreduce(&n_local, &n_total, 1, par::get_mpi_type< decltype(n_local) >(), MPI_SUM, comm);
-    MPI_Allreduce(&n_local, &n_max,   1, par::get_mpi_type< decltype(n_local) >(), MPI_MAX, comm);
-    n_avg = n_total / nprocs;
-    double imb = static_cast<double>(n_max) / static_cast<double>(n_avg);
 
-    double mass_center = std::accumulate(begin, end, 0.0, [&getVal](auto& prev, auto& next){ return prev + getVal(next);});
-    mass_center /= static_cast<double>(n_total);
-    MPI_Allreduce(MPI_IN_PLACE, &mass_center, 1, par::get_mpi_type<decltype(mass_center)>(), MPI_SUM, comm);
+    unsigned nt_gt = 0, nt_lt = 0;
+    double current_cut;
+    unsigned current_n_total;
 
-    // check if actual median lies outside of tolerance zone
-    unsigned n_lower_than, n_greater_than;
-    if(imb > tol) {
-        double current_cut = guess.value_or(mass_center);
-        while(true) {
-            std::cout << current_cut << std::endl;
+    do {
+        MPI_Allreduce(&n_local, &current_n_total, 1, par::get_mpi_type< decltype(n_local) >(), MPI_SUM, comm);
 
-            MPI_Bcast(&current_cut, 1, MPI_DOUBLE, 0, comm);
-            auto n_lower_than_it = std::lower_bound(begin, end, current_cut, [&getVal](auto& v, auto& value){ return getVal(v) < value; });
-            unsigned currennt_n_lower_than;
-            MPI_Allreduce(MPI_IN_PLACE, &currennt_n_lower_than, 1, par::get_mpi_type<decltype(n_lower_than)>(), MPI_SUM, comm);
-            n_greater_than = n_total - n_lower_than;
-            imb = std::fabs(n_lower_than - n_greater_than) / n_total;
-            if(imb <= tol) return current_cut;
+        double mass_center = std::accumulate(begin, end, 0.0, [getVal](const auto& prev, const auto& next){ return prev + getVal(next);}) / static_cast<double>(current_n_total);
+        MPI_Allreduce(MPI_IN_PLACE, &mass_center, 1, par::get_mpi_type<decltype(mass_center)>(), MPI_SUM, comm);
+        current_cut = iteration == 0 ? guess.value_or(mass_center) : mass_center;
 
-            if (n_lower_than > n_greater_than) {
-                end = n_lower_than_it;
-            } else if (n_greater_than > n_lower_than) {
-                begin = n_lower_than_it;
-            }
+        auto n_lower_than_it = std::partition(begin, end, [getVal, current_cut](const auto& v){ return getVal(v) < current_cut; });
 
-            mass_center = std::accumulate(begin, end, 0.0, [&getVal](auto& prev, auto& next){ return prev + getVal(next);});
-            mass_center /= static_cast<double>(n_total);
-            MPI_Allreduce(MPI_IN_PLACE, &mass_center, 1, par::get_mpi_type<decltype(mass_center)>(), MPI_SUM, comm);
-            if(std::fabs(current_cut - mass_center) <= 1e-12) return std::nullopt;
-            current_cut = mass_center;
+        unsigned current_local_n_lt = std::distance(begin, n_lower_than_it), current_global_n_lt, current_global_n_gt;
+        MPI_Allreduce(&current_local_n_lt, &current_global_n_lt,1, par::get_mpi_type<decltype(current_local_n_lt)>(), MPI_SUM, comm);
+        current_global_n_gt = current_n_total - current_global_n_lt;
+
+        const double lt_fraction = static_cast<double>(nt_lt + current_global_n_lt) / static_cast<double>(n_total);
+        const double gt_fraction = static_cast<double>(nt_gt + current_global_n_gt) / static_cast<double>(n_total);
+
+        if((lt_fraction - epsilon >= acceptable_range_min && lt_fraction + epsilon <= acceptable_range_max) ||
+                (gt_fraction - epsilon >= acceptable_range_min && gt_fraction + epsilon <= acceptable_range_max)) { // this is good we stop
+            return current_cut;
         }
-    } else {
-        return std::nullopt;
-    }
+
+        if(lt_fraction > gt_fraction) { // keep gt half
+            end = n_lower_than_it;
+            nt_gt += current_global_n_gt;
+        } else { // keep lt half
+            begin = n_lower_than_it;
+            nt_lt += current_global_n_lt;
+        }
+        n_local = std::distance(begin, end);
+    } while(iteration++ < std::log(n_total));
+
+    return std::nullopt;
 }
 
 }

@@ -38,6 +38,7 @@ void sort_rs(std::vector<T>& data, MPI_Datatype datatype, MPI_Comm comm, GetVal 
     const auto n_all_samples = nprocs * n_samples; //p(p-1) samples
     std::unique_ptr<value_type []> samples_of_samples(new value_type [n_samples]);
     std::unique_ptr<value_type []> all_samples(new value_type [n_all_samples]);
+
     MPI_Gather(my_samples.data(), n_samples, mpi_value_type, all_samples.get(), n_samples, datatype, 0, comm);
 
     if(!rank) {
@@ -49,9 +50,6 @@ void sort_rs(std::vector<T>& data, MPI_Datatype datatype, MPI_Comm comm, GetVal 
 
     MPI_Bcast(samples_of_samples.get(), n_samples, mpi_value_type, 0, comm);
 
-    // 0 keeps data <= samples_of_samples[0] && > -DBL_MAX
-    // 1 keeps data <= samples_of_samples[1] && > samples_of_samples[0]
-    // 2 keeps data <= samples_of_samples[2] && > samples_of_samples[1] etc..
     auto prev_it = beg;
     std::vector<MPI_Request > sreqs(nprocs);
     for(auto i = 0; i < n_samples; ++i) {
@@ -78,7 +76,8 @@ void sort_rs(std::vector<T>& data, MPI_Datatype datatype, MPI_Comm comm, GetVal 
         MPI_Recv(buff.get() + displs, count.at(i), datatype, i, 9876, comm, MPI_STATUS_IGNORE);
     }
 
-    MPI_Waitall(nprocs, sreqs.data(), MPI_STATUSES_IGNORE);
+    MPI_Waitall(sreqs.size(), sreqs.data(), MPI_STATUSES_IGNORE);
+
     data.clear();
     data.reserve(total_count);
     std::copy(buff.get(), buff.get()+total_count, std::back_inserter(data));
