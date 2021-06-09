@@ -40,11 +40,11 @@ int main()
     for(auto i = 0; i < S; ++i) {
         x[i].myVal = y[i].myVal = (lognormalDistribution(gen));
     }
-    //sort_rs(x, custom_dt, MPI_COMM_WORLD, [](auto& x){return x.myVal;});
+    sort_rs(x, custom_dt, MPI_COMM_WORLD, [](auto& x){return x.myVal;});
 
     MPI_Barrier(MPI_COMM_WORLD);
     auto t1 = MPI_Wtime();
-    auto m = par::find_spatial_median(x.begin(), x.end(), 0.0001, MPI_COMM_WORLD, [](auto& x){return x.myVal;}, std::nullopt);
+    auto m = par::find_spatial_median(r,w,x.begin(), x.end(), 0.001, MPI_COMM_WORLD, [](auto& x){return x.myVal;}, std::nullopt);
     MPI_Barrier(MPI_COMM_WORLD);
     auto t2 = MPI_Wtime();
     par::pcout() << m.value_or(std::numeric_limits<double>::lowest()) << std::endl;
