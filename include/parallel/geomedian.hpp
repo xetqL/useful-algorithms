@@ -50,7 +50,7 @@ std::optional<std::tuple<double, It>> find_spatial_median(int rank, int nprocs, 
 
         if((lt_fraction - epsilon >= acceptable_range_min && lt_fraction + epsilon <= acceptable_range_max) ||
            (gt_fraction - epsilon >= acceptable_range_min && gt_fraction + epsilon <= acceptable_range_max)) { // this is good we stop
-            return {current_cut, n_lower_than_it};
+            return std::make_tuple(current_cut, n_lower_than_it);
         }
 
         if(lt_fraction > gt_fraction) { // keep gt half

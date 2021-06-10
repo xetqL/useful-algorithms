@@ -40,14 +40,23 @@ int main()
     for(auto i = 0; i < S; ++i) {
         x[i].myVal = y[i].myVal = (lognormalDistribution(gen));
     }
-    sort_rs(x, custom_dt, MPI_COMM_WORLD, [](auto& x){return x.myVal;});
+    //sort_rs(x, custom_dt, MPI_COMM_WORLD, [](auto& x){return x.myVal;});
 
     MPI_Barrier(MPI_COMM_WORLD);
     auto t1 = MPI_Wtime();
-    auto m = par::find_spatial_median(r,w,x.begin(), x.end(), 0.001, MPI_COMM_WORLD, [](auto& x){return x.myVal;}, std::nullopt);
+    auto m = par::find_spatial_median(r, w, x.begin(), x.end(), 0.001, MPI_COMM_WORLD, [](auto& x){return x.myVal;}, std::nullopt);
     MPI_Barrier(MPI_COMM_WORLD);
     auto t2 = MPI_Wtime();
-    par::pcout() << m.value_or(std::numeric_limits<double>::lowest()) << std::endl;
+    double med;
+    typename decltype(x)::iterator it;
+
+    if(m)
+        std::tie(med, it) = m.value();
+
+
+
+    par::pcout() << std::is_partitioned(x.begin(), x.end(), [med](auto& x){return x.myVal < med;}) <<
+                    " " << med << std::endl;
 
     par::pcout() << "Time for parallel is " << (t2-t1) << " [s]" << std::endl;
     MPI_Barrier(MPI_COMM_WORLD);
