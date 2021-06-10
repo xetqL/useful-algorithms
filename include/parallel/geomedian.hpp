@@ -11,7 +11,7 @@ namespace par {
 // can be downcast l8r
 
 template<class It, class GetValue>
-std::optional<std::tuple<double, It>> find_spatial_median(int rank, int nprocs, It begin, It end, double tol, MPI_Comm comm, GetValue getVal, std::optional<double> guess) {
+std::optional<std::tuple<double, It>> find_spatial_median(int rank, int nprocs, It begin, It end, double tol, MPI_Comm comm, GetValue getVal, std::optional<double> guess, std::optional<unsigned> stop_after) {
     const double epsilon = 1e-9, half = 0.5, acceptable_range_min = half - tol, acceptable_range_max = half + tol;
     unsigned iteration = 0;
     auto n_local = std::distance(begin, end);
@@ -22,11 +22,10 @@ std::optional<std::tuple<double, It>> find_spatial_median(int rank, int nprocs, 
     unsigned nt_gt = 0, nt_lt = 0;
     double current_cut;
     decltype(n_local) current_n_total;
-
+    unsigned max_turn = stop_after.value_or(std::log(n_total)/std::log(2));
     do {
         MPI_Allreduce(&n_local, &current_n_total, 1, par::get_mpi_type< decltype(n_local) >(), MPI_SUM, comm);
-        // if a lot of imbalance, this is in O(n)
-
+        // if a lot of imbalance, this is in O(n/p)
         double mass_center=0.0;
         for(auto b = begin; b < end; b += nprocs){
             mass_center += getVal(*begin); //std::accumulate(begin, end, 0.0, [getVal](const auto& prev, const auto& next){ return prev + getVal(next);}
@@ -62,7 +61,7 @@ std::optional<std::tuple<double, It>> find_spatial_median(int rank, int nprocs, 
         }
 
         n_local = std::distance(begin, end);
-    } while(iteration++ < std::log(n_total));
+    } while(iteration++ < max_turn);
 
     return std::nullopt;
 }
