@@ -11,7 +11,7 @@ namespace par {
 // can be downcast l8r
 
 template<class It, class GetValue>
-std::optional<double> find_spatial_median(int rank, int nprocs, It begin, It end, double tol, MPI_Comm comm, GetValue getVal, std::optional<double> guess) {
+std::optional<std::tuple<double, It>> find_spatial_median(int rank, int nprocs, It begin, It end, double tol, MPI_Comm comm, GetValue getVal, std::optional<double> guess) {
     const double epsilon = 1e-9, half = 0.5, acceptable_range_min = half - tol, acceptable_range_max = half + tol;
     unsigned iteration = 0;
     auto n_local = std::distance(begin, end);
@@ -49,8 +49,8 @@ std::optional<double> find_spatial_median(int rank, int nprocs, It begin, It end
         const double gt_fraction = static_cast<double>(nt_gt + current_global_n_gt) / static_cast<double>(n_total);
 
         if((lt_fraction - epsilon >= acceptable_range_min && lt_fraction + epsilon <= acceptable_range_max) ||
-                (gt_fraction - epsilon >= acceptable_range_min && gt_fraction + epsilon <= acceptable_range_max)) { // this is good we stop
-            return current_cut;
+           (gt_fraction - epsilon >= acceptable_range_min && gt_fraction + epsilon <= acceptable_range_max)) { // this is good we stop
+            return {current_cut, n_lower_than_it};
         }
 
         if(lt_fraction > gt_fraction) { // keep gt half
