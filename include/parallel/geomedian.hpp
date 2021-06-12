@@ -26,12 +26,8 @@ std::optional<std::tuple<double, It>> find_spatial_median(int rank, int nprocs, 
     do {
         MPI_Allreduce(&n_local, &current_n_total, 1, par::get_mpi_type< decltype(n_local) >(), MPI_SUM, comm);
         // if a lot of imbalance, this is in O(n/p)
-        double mass_center=0.0;
-        for(auto b = begin; b < end; b += nprocs){
-            mass_center += getVal(*begin); //std::accumulate(begin, end, 0.0, [getVal](const auto& prev, const auto& next){ return prev + getVal(next);}
-        }
-
-        mass_center /= static_cast<double>(current_n_total / nprocs);
+        double mass_center= std::accumulate(begin, end, 0.0, [getVal](const auto& prev, const auto& next){ return prev + getVal(next);});
+        mass_center /= static_cast<double>(current_n_total);
         MPI_Allreduce(MPI_IN_PLACE, &mass_center, 1, par::get_mpi_type<decltype(mass_center)>(), MPI_SUM, comm);
 
         current_cut = iteration == 0 ? guess.value_or(mass_center) : mass_center;
